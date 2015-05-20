@@ -8,74 +8,48 @@ import csv
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv('train.csv', index_col=0)
+df = pd.read_csv('train.csv', index_col=0) #Read in the data
 
-#Changing the column names
+df.isnull() #Exploring the data
+df.isnull().sum()
 df.columns
-df.rename(columns={'ReputationAtPostCreation':'Reputation', 'BodyMarkdown':'Body', 'PostCreationDate':'PostDate', 'OwnerCreationDate':'OwnerDate', 'OwnerUndeletedAnswerCountAtPostTime':'Answers', 'OpenStatus':'Status'}, inplace=True)
+df.head()
 
-df.isnull().sum() #To check the column names
+df.groupby(df.OpenStatus).describe()
 
+feat_cols = ['ReputationAtPostCreation'] #Begin the Logistic Regression process
+X = df[feat_cols]
+y = df.OpenStatus
 
-df['PostDate'] = pd.to_datetime(df.PostDate)
-df['OwnerDate'] = pd.to_datetime(df.OwnerDate)
-df['PostClosedDate'] = pd.to_datetime(df.PostClosedDate)
-#Standardizing Dates...
+from sklearn.cross_validation import train_test_split #Code for train, test, split
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=1)
 
-#This is where we would create new features.
-df['BodyLength'] = df.Body.apply(len)
-df['TitleLength'] = df.Title.apply(len)
+from sklearn.linear_model import LogisticRegression #Fitting the model with an import from scikit.learn for Logsitic Regression
+logreg = LogisticRegression()                       #Instantiate
+logreg.fit(X_train, y_train)                        
 
-df['PostCount'] = 0
-for item in df.sort('OwnerUserId'):
+logreg.coef_ 
 
+y_pred = logreg.predict(X_test) #Prediction line
 
-df.groupby(df.Status).PostId.describe()
-df.groupby(df.Status).Answers.describe()
-df.groupby(df.Status).OwnerDate.describe()
-df.sort('OwnerDate')
+from sklearn import metrics #Checking the results for accuracy
+metrics.accuracy_score(y_test, y_pred)
 
-pd.scatter_matrix(df)
+metrics.confusion_matrix(y_test, y_pred)
 
-
-dates = pd.date_range(df.PostDate.min(), df.PostDate.max(), freq='D')
-
-print dates
-print dates.shape
-
-ts = pd.Series(df.Reputation.sum(), index=dates)
-ts = ts.cumsum()
-ts.plot()
-
-
-
-
-#Fitting the model
-feat_cols = ['PostId', 'Answers', 'OwnerUserId']
-from sklearn.cross_validation import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(df[feat_cols], df.Status)
-
-#Logistic regression
-from sklearn.linear_model import LogisticRegression
-logreg = LogisticRegression()
-logreg.fit(X_train, y_train)
-y_pred = logreg.predict(X_test)
-from sklearn import metrics
-metrics.accuracy_score(y_pred, y_test)
-
-
-feat_cols = ['Reputation', 'Answers', 'OwnerUserId', 'BodyLength', 'TitleLength']
-from sklearn.cross_validation import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(df[feat_cols], df.Status)
-logreg = LogisticRegression()
-logreg.fit(X_train, y_train)
-
-y_prob = logreg.predict_proba(X_test)
-
-from sklearn import metrics
+y_prob = logreg.predict_proba(X_test)[:, 1] #Probability predictor
+metrics.roc_auc_score(y_test, y_prob)
 metrics.log_loss(y_test, y_prob)
 
 
+testdf = pd.read_csv('test.csv', index_col=0) #Testing on the test set
+testdf.head()
 
-sub = pd.DataFrame({'id':test.index, 'OpenStatus':y_prob}).set_index('id')
+logreg.fit(X, y) 
+
+#And then make our prediction on all of the test data
+test_pred = logreg.predict_proba(testdf[feat_cols])[:,1]
+
+#Creating the submission
+sub = pd.DataFrame({'id':testdf.index, 'OpenStatus':test_pred}).set_index('id')
 sub.to_csv('sub1.csv')
